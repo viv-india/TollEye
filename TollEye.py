@@ -3,11 +3,11 @@ from keras.models import load_model
 from keras import backend as K
 K.set_image_dim_ordering('th')
 import cv2,os
-def load_model()
+def load_model():
 	json_file = open('model.json', 'r')
 	loaded_model_json = json_file.read()
 	json_file.close()
-	 model = model_from_json(loaded_model_json)
+	model = model_from_json(loaded_model_json)
 	# load weights into model
 	model.load_weights("model.h5")
 	print("Loaded model from disk")
