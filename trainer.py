@@ -39,12 +39,11 @@ def get_data():
 	img_r=128
 	img_c=128
 	ch=1
- 	epoch=15
-
+	epoch=15
 ########### DATA FORMATTING #################
 def format_data():
-	dataset in dir_list:
-	img_list=os.listdir(data_path+'/'+dataset)
+	for dataset in dir_list:
+		img_list=os.listdir(data_path+'/'+dataset)
 	
 	if dataset == 'CAR':
 		car_count=img_list.shape[0]
@@ -57,7 +56,7 @@ def format_data():
 	
 
 	img_dlist=[] #image array
-   	print(dataset+"images loaded\n")
+	print(dataset+"images loaded\n")
 	for img in img_list:
 		in_im=cv2.imread(data_path+'/'+dataset+'/'+img)
 		in_im=cv2.cvtColor(in_im,cv2.COLOR_BGR2GRAY) #GRAY CONVERSION
@@ -123,7 +122,7 @@ def model_defination(data):
 	np.shape(model.layers[0].get_weights()[0])
 	model.layers[0].trainable
 	return model
-def train_model(model)	
+def train_model(model):	
 	hist = model.fit(X_train, y_train, batch_size=16, nb_epoch=num_epoch, verbose=1, validation_data=(X_test, y_test))
 	filename='model_train_new.csv'
 	csv_log=callbacks.CSVLogger(filename, separator=',', append=False)
@@ -174,7 +173,7 @@ def save_model(model):
 	# serialize model to json
 	model_json = model.to_json()
 	with open("model.json", "w") as json_file:
-    json_file.write(model_json)
+  	  json_file.write(model_json)
 	# serialize weights to HDF5
 	model.save_weights("model.h5")
 	print("Saved model to disk")
