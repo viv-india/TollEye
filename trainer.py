@@ -15,24 +15,21 @@ import matplotlib.pyplot as pyplot
 from keras import callbacks
 from keras.models import model_from_json
 from keras.models import load_model
-
-global data_path #path to data set
-global dir_list #contains dirctories in main data set file
-global classes #number of classes to recognize
-global img_r #rows in image
-global img_c #columns in image
-global ch #number of channels 
-global epoch #number of epochs
-global truck_count
-global mini_truck_count
-global bus_count
-global car_count
-global X_test
-global Y_test
-
+import numpy as np
+ 
 	
 ############# DATA LOADING ##################
 def get_data():
+	global data_path #path to data set
+	global dir_list #contains dirctories in main data set file
+	global classes #number of classes to recognize
+	global img_r #rows in image
+	global img_c#columns in image
+	global dir_list
+	global channel
+	global epoch #number of epochs
+
+	channel=1
 	data_path = os.getcwd()+'/vehicles'
 	dir_list = os.listdir(data_path)
 	classes = 4 #car,bus,mini-truck,truck
@@ -42,38 +39,55 @@ def get_data():
 	epoch=15
 ########### DATA FORMATTING #################
 def format_data():
+	
+	global truck_count
+	global mini_truck_count
+	global bus_count
+	global car_count
+	truck_count=0
+	mini_truck_count=0
+	bus_count=0
+	car_count=0
+	im_dlist=[] #image array
 	for dataset in dir_list:
 		img_list=os.listdir(data_path+'/'+dataset)
+		if dataset == 'CAR':
+			car_count=len(img_list)
+		if dataset == 'TRUCK':
+			truck_count=len(img_list)
+		if dataset == 'BUS':
+			bus_count=len(img_list)
+		if dataset == 'MINI_TRUCK':
+			mini_truck_count=len(img_list)
 	
-	if dataset == 'CAR':
-		car_count=img_list.shape[0]
-	if dataset == 'TRUCK':
-		truck_count=img_list.shape[0]
-	if dataset == 'BUS':
-		bus_count=img_list.shape[0]
-	if dataset == 'MINI_TRUCK':
-		mini_truck_count=img_list.shape[0]
-	
-
-	img_dlist=[] #image array
-	print(dataset+"images loaded\n")
-	for img in img_list:
-		in_im=cv2.imread(data_path+'/'+dataset+'/'+img)
-		in_im=cv2.cvtColor(in_im,cv2.COLOR_BGR2GRAY) #GRAY CONVERSION
-		in_im=cv2.resize(in_im,(128,128)) #resize to make all images of same size
-		image_dlist.append(in_im)
+		print(dataset+"images loaded\n")
+		for img in img_list:
+			in_im=cv2.imread(data_path+'/'+dataset+'/'+img)
+			in_im=cv2.cvtColor(in_im,cv2.COLOR_BGR2GRAY) #GRAY CONVERSION
+			in_im=cv2.resize(in_im,(128,128)) #resize to make all images of same size
+			im_dlist.append(in_im)
 
 	data=np.array(im_dlist)
 	data=data.astype('float32')
 	data /=255 #making all values from 0 to 1 to make training converge quick
 	print(data.shape)
-	data=np.rollaxis(data,3,1)
-	print(data.shape)
+	if channel==1:
+		if K.image_dim_ordering()=='th':
+			data= np.expand_dims(data, axis=1) 
+			print (data.shape)
+		else:
+			data= np.expand_dims(data, axis=4) 
+			print (data.shape)
+			
+	else:
+		if K.image_dim_ordering()=='th':
+			data=np.rollaxis(data,3,1)
+			print (data.shape)
 	return data
 
 def data_labeling(data):
 	sample_count=data.shape[0]
-	labels = np.zeroes((sample_count),dtype='int64')
+	labels = np.ones((sample_count),dtype='int64')
 	total=0
 	labels[total : total+car_count] =0;
 	total=car_count
@@ -84,9 +98,11 @@ def data_labeling(data):
 	labels[total : total+ mini_truck_count] =3;
 	total+= mini_truck_count
 
+	global X_test,X_train
+	global y_test,y_train
 	label_names = ['CAR','BUS','TRUCK','MINI-TRUCK']
 	Y = np_utils.to_categorical(labels,classes)#one hot encoding
-	x,y = shuffle(img_data,Y,random_state=2)#shuffling data to make system strong 
+	x,y = shuffle(data,Y,random_state=2)#shuffling data to make system strong 
 	X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=2) #giving 20% data for testing
 
 def model_defination(data):
@@ -107,7 +123,7 @@ def model_defination(data):
 	model.add(Dense(64))
 	model.add(Activation('relu'))
 	model.add(Dropout(0.5))
-	model.add(Dense(num_classes))
+	model.add(Dense(classes))
 	model.add(Activation('softmax'))
 	model.compile(loss='categorical_crossentropy', optimizer='rmsprop',metrics=["accuracy"])
 
@@ -123,21 +139,21 @@ def model_defination(data):
 	model.layers[0].trainable
 	return model
 def train_model(model):	
-	hist = model.fit(X_train, y_train, batch_size=16, nb_epoch=num_epoch, verbose=1, validation_data=(X_test, y_test))
+	hist = model.fit(X_train, y_train, batch_size=16, nb_epoch=epoch, verbose=1, validation_data=(X_test, y_test))
 	filename='model_train_new.csv'
 	csv_log=callbacks.CSVLogger(filename, separator=',', append=False)
 	early_stopping=callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=0, verbose=0, mode='min')
 	filepath="Best-weights-my_model-{epoch:03d}-{loss:.4f}-{acc:.4f}.hdf5"
 	checkpoint = callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 	callbacks_list = [csv_log,early_stopping,checkpoint]
-	hist = model.fit(X_train, y_train, batch_size=16, nb_epoch=num_epoch, verbose=1, validation_data=(X_test, y_test),callbacks=callbacks_list)
+	hist = model.fit(X_train, y_train, batch_size=16, nb_epoch=epoch, verbose=1, validation_data=(X_test, y_test),callbacks=callbacks_list)
 
 	# visualizing losses and accuracy
 	train_loss=hist.history['loss']
 	val_loss=hist.history['val_loss']
 	train_acc=hist.history['acc']
 	val_acc=hist.history['val_acc']
-	xc=range(num_epoch)
+	xc=range(epoch)
 	plt.figure(1,figsize=(7,5))
 	plt.plot(xc,train_loss)
 	plt.plot(xc,val_loss)
@@ -158,7 +174,8 @@ def train_model(model):
 	plt.legend(['train','val'],loc=4)
 	#print plt.style.available # use bmh, classic,ggplot for big pictures
 	plt.style.use(['classic'])
-	plt.show()
+	plt.show() 
+	return model
 def model_evaluation(model):
 	score = model.evaluate(X_test, y_test, show_accuracy=True, verbose=0)
 	print('Test Loss:', score[0])
@@ -177,4 +194,10 @@ def save_model(model):
 	# serialize weights to HDF5
 	model.save_weights("model.h5")
 	print("Saved model to disk")
-
+get_data()
+data=format_data()
+data_labeling(data)
+model=model_defination(data)
+model=train_model(model)
+model_evaluation(model)
+save_model(model)
