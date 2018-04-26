@@ -3,7 +3,7 @@ import os #to get working directory
 from sklearn.utils import shuffle
 from sklearn.cross_validation import train_test_split
 from keras import backend as K
-K.set_image_dim_ordering('th')
+K.set_image_dim_ordering('tf')
 from keras.utils import np_utils
 import cv2
 from keras.models import Sequential
@@ -11,7 +11,7 @@ from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.optimizers import SGD,RMSprop,adam
 from sklearn import preprocessing
-import matplotlib.pyplot as pyplot
+import matplotlib.pyplot as plt
 from keras import callbacks
 from keras.models import model_from_json
 from keras.models import load_model
@@ -30,24 +30,27 @@ def get_data():
 	global epoch #number of epochs
 
 	channel=1
-	data_path = os.getcwd()+'/vehicles'
+	data_path = os.getcwd()+'/frame_data'
 	dir_list = os.listdir(data_path)
-	classes = 4 #car,bus,mini-truck,truck
+	classes = 5 #car,bus,mini-truck,truck
 	img_r=128
 	img_c=128
 	ch=1
 	epoch=15
-########### DATA FORMATTING #################
+########## DATA FORMATTING #################
 def format_data():
 	
 	global truck_count
 	global mini_truck_count
 	global bus_count
 	global car_count
+	global bike_count
+	
 	truck_count=0
 	mini_truck_count=0
 	bus_count=0
 	car_count=0
+	bike_count=0
 	im_dlist=[] #image array
 	for dataset in dir_list:
 		img_list=os.listdir(data_path+'/'+dataset)
@@ -57,9 +60,11 @@ def format_data():
 			truck_count=len(img_list)
 		if dataset == 'BUS':
 			bus_count=len(img_list)
-		if dataset == 'MINI_TRUCK':
+		if dataset == 'MINITRUCK':
 			mini_truck_count=len(img_list)
-	
+		if dataset == 'bike':
+			bike_count=len(img_list)
+
 		print(dataset+"images loaded\n")
 		for img in img_list:
 			in_im=cv2.imread(data_path+'/'+dataset+'/'+img)
@@ -89,22 +94,35 @@ def data_labeling(data):
 	sample_count=data.shape[0]
 	labels = np.ones((sample_count),dtype='int64')
 	total=0
-	labels[total : total+car_count] =0;
-	total=car_count
-	labels[total : total+ bus_count] =1;
+	labels[total : total+bike_count] =1;
+	total=bike_count
+	labels[total : total+ bus_count] =3;
 	total+= bus_count
+	labels[total : total+car_count] =0;
+	total+=car_count
 	labels[total : total+ truck_count] =2;
 	total+= truck_count
-	labels[total : total+ mini_truck_count] =3;
+	labels[total : total+ mini_truck_count] =4;
 	total+= mini_truck_count
+
+	print("###"+str(car_count))
+	print(bus_count)
+	print(truck_count)
+	print(mini_truck_count)
+	print("####")
+	for i in labels:
+		print(i)
+
 
 	global X_test,X_train
 	global y_test,y_train
-	label_names = ['CAR','BUS','TRUCK','MINI-TRUCK']
+	label_names = ['CARS','bike','TRUCK','BUS','MINITRUCK']
 	Y = np_utils.to_categorical(labels,classes)#one hot encoding
-	x,y = shuffle(data,Y,random_state=2)#shuffling data to make system strong 
-	X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=2) #giving 20% data for testing
+	x,y = shuffle(data,Y,random_state=5)#shuffling data to make system strong 
+	X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.30, random_state=5) #giving 20% data for testing
 
+
+	
 def model_defination(data):
 	in_shape=data[0].shape
 
@@ -140,15 +158,22 @@ def model_defination(data):
 	return model
 def train_model(model):	
 	hist = model.fit(X_train, y_train, batch_size=16, nb_epoch=epoch, verbose=1, validation_data=(X_test, y_test))
-	filename='model_train_new.csv'
-	csv_log=callbacks.CSVLogger(filename, separator=',', append=False)
-	early_stopping=callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=0, verbose=0, mode='min')
-	filepath="Best-weights-my_model-{epoch:03d}-{loss:.4f}-{acc:.4f}.hdf5"
-	checkpoint = callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
-	callbacks_list = [csv_log,early_stopping,checkpoint]
-	hist = model.fit(X_train, y_train, batch_size=16, nb_epoch=epoch, verbose=1, validation_data=(X_test, y_test),callbacks=callbacks_list)
+	# filename='model_train_new.csv'
+	# csv_log=callbacks.CSVLogger(filename, separator=',', append=False)
+	# early_stopping=callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=0, mode='min')
+	# filepath="Best-weights-my_model-{epoch:03d}-{loss:.4f}-{acc:.4f}.hdf5"
+	# checkpoint = callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+	# callbacks_list = [csv_log,early_stopping,checkpoint]
+	# hist = model.fit(X_train, y_train, batch_size=16, nb_epoch=epoch, verbose=1, validation_data=(X_test, y_test),callbacks=callbacks_list)
 
 	# visualizing losses and accuracy
+
+	# import csv
+	# input_file = open(filename,"r+")
+	# reader_file = csv.reader(input_file)
+	# value = len(list(reader_file))
+	# value=value-1
+
 	train_loss=hist.history['loss']
 	val_loss=hist.history['val_loss']
 	train_acc=hist.history['acc']
@@ -177,7 +202,7 @@ def train_model(model):
 	plt.show() 
 	return model
 def model_evaluation(model):
-	score = model.evaluate(X_test, y_test, show_accuracy=True, verbose=0)
+	score = model.evaluate(X_test, y_test, verbose=0)
 	print('Test Loss:', score[0])
 	print('Test accuracy:', score[1])
 	test_image = X_test[0:1]
@@ -193,6 +218,7 @@ def save_model(model):
   	  json_file.write(model_json)
 	# serialize weights to HDF5
 	model.save_weights("model.h5")
+	model.save('model.hdf5')
 	print("Saved model to disk")
 get_data()
 data=format_data()
